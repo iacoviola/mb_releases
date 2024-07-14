@@ -9,7 +9,18 @@ import argparse
 
 artists_path = 'parsed_artists.txt'
 
-skip_rt = ['Compilation', 'Soundtrack', 'Spokenword', 'Interview', 'Audiobook', 'Live', 'Remix', 'DJ-mix', 'Mixtape', 'Demo', 'Bootleg', 'Other']
+skip_rt = ['Compilation', 
+           'Soundtrack', 
+           'Spokenword', 
+           'Interview', 
+           'Audiobook', 
+           'Live', 
+           'Remix', 
+           'DJ-mix', 
+           'Mixtape', 
+           'Demo', 
+           'Bootleg', 
+           'Other']
 
 db = DBH('db/music.db')
 
@@ -52,31 +63,9 @@ def handle_artist(artist_name):
         logger.info('Found artist: ' + a['name'])
         return Artist(a['id'], a['name'], a['disambiguation'])
 
-"""def check_existing_artists(filepath, type='name'):
-    if type == 'name':
-        new_artists = load_artists(filepath)
-    else:
-        new_artists = [a.split(':')[1] for a in load_artists(filepath)]
-    
-    try:
-        with open(artists_path) as file:
-            ex = file.read().splitlines()
-    except FileNotFoundError:
-        logger.info('No existing artists found')
-        return new_artists
-
-    #split existing artists into name and id and check if the name is in the new artists
-    index = 0 if type == 'name' else 1
-
-    ex = [artist.split(':')[index].lower() for artist in ex]
-    return [artist for artist in new_artists if artist.lower() not in ex]"""
-
 def import_artists(filepath):
-    new_artists = load_artists(filepath)#check_existing_artists(filepath)
+    new_artists = load_artists(filepath)
 
-    #p_file = open(artists_path).read().splitlines()
-
-    #with open(artists_path, 'a') as file:
     for artist in new_artists:
         logger.info('Handling artist: ' + artist)
         res = handle_artist(artist)
@@ -98,11 +87,12 @@ def get_new_releases():
         today = datetime.date.today() - datetime.timedelta(days=14)
 
         while True:
-            rl = mb.get_release_group(mbid, 100, offset)
+            LIMIT = 100
+            rl = mb.get_release_group(mbid, LIMIT, offset)
             releases = [r for r in rl if r['first-release-date'] >= today.isoformat()]
-            if len(releases) < 100:
+            if len(releases) < LIMIT:
                 break
-            offset += 100
+            offset += LIMIT
 
         for release in releases:
             pt = release['primary-type']
@@ -111,7 +101,6 @@ def get_new_releases():
             rd = release['first-release-date']
             tit = release['title']
 
-            #if pt not in skip_rt and not any(t in skip_rt for t in st):
             tid, = db.type_id(pt)
             orid = db.release_id(rmbid)
             if not orid:
