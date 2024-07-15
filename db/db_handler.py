@@ -1,105 +1,120 @@
 import sqlite3
-from artist import Artist
-from release import Release
+from ext import logger
+from query_builder import QueryBuilder as QB
 
 class DBHandler:
-    def __init__(self, db_name):
-        self.conn = sqlite3.connect(db_name)
-        self.cursor = self.conn.cursor()
 
-    def all_artists(self):
-        self.cursor.execute('SELECT * FROM artists')
+    _instance = None
+
+    def __new__(cls, db_name):
+        if not hasattr(cls, 'instance'):
+            cls.instance = super(DBHandler, cls).__new__(cls)
+            cls.instance.conn = sqlite3.connect(db_name)
+            cls.instance.cursor = cls.instance.conn.cursor()
+        return cls.instance
+    
+    def close(self):
+        self.conn.close()
+
+    def _fetchbuild(self, table, columns='*', joins=None, wheres=None):
+        qb = QB().select(columns).table(table)
+        if joins:
+            for join in joins:
+                qb.join(join['table'], 
+                        join['condition'], 
+                        join['type'] if 'type' in join else 'INNER')
+        if wheres:
+            for where in wheres:
+                qb.where(where['condition'], where['params'])
+        return qb.build()
+
+    def fetchall(self, table, columns='*', joins=None, wheres=None):
+        query, params = self._fetchbuild(table, 
+                                         columns, 
+                                         joins, 
+                                         wheres)
+        self.cursor.execute(query, params)
         return self.cursor.fetchall()
 
-    def all_releases(self):
-        self.cursor.execute('SELECT * FROM releases')
+    
+    def fetchone(self, table, columns='*', joins=None, condition=None):
+        query, params = self._fetchbuild(table, 
+                                         columns, 
+                                         joins, 
+                                         condition)
+        self.cursor.execute(query, params)
+        return self.cursor.fetchone()
+    
+    def insert(self, table, columns=(), values=()):
+        if len(columns) != len(values):
+            raise ValueError('Columns and values must have the same length')
+        
+        query = f"""INSERT INTO {table} 
+                    ({"" if not columns else ", ".join(columns)}) 
+                         VALUES ({", ".join(["?" for _ in values])})"""
+        
+        self.cursor.execute(query, values)
+        self.conn.commit()
+
+        return self.cursor.lastrowid
+    
+    def update(self, table, columns, values, condition, params=()):
+        if len(columns) != len(values):
+            raise ValueError('Columns and values must have the same length')
+        
+        if len(columns) == 0:
+            raise ValueError('Columns must have at least one element')
+        
+        query = f'UPDATE {table} SET {", ".join([f"{c} = ?" for c in columns])} WHERE {condition}'
+        self.cursor.execute(query, values + params)
+        self.conn.commit()
+
+    def delete(self, table, condition, params=()):
+        query = f'DELETE FROM {table} WHERE {condition}'
+        self.cursor.execute(query, params)
+        self.conn.commit()
+
+    def file_releases(self, skip_types=[], format='ics'):
+
+        qb = QB().select(['r.id', 'mbid', 'artist_mbid', 'title', 'release_date', 't2.name'])
+        qb.table('releases AS r')
+        qb.join('types_releases AS tr', 'r.id = tr.release_id', 'LEFT')
+        qb.join('types AS t', 'tr.type_id = t.id', 'LEFT')
+        qb.join('types AS t2', 'r.primary_type = t2.id')
+
+        if skip_types:
+            qb.where(f'(t.name NOT IN ({", ".join(["?" for _ in skip_types])})
+                        OR t.name ISNULL)', skip_types)
+            
+        if format == 'rss':
+            qb.where('r.release_date > date("now", "-14 days")')
+            qb.where('r.release_date <= date("now", "+1 day")')
+
+        query, params = qb.build()
+        logger.debug(query)
+        self.cursor.execute(query, params)
         return self.cursor.fetchall()
-
-    def ical_releases(self, skip_types=[]):
-
+        
+        
+        '''
         bq = """SELECT DISTINCT r.id, mbid, artist_mbid, title,          
                                 release_date, t2.name
                     FROM releases as r
                     LEFT JOIN types_releases as tr ON r.id = tr.release_id
                     LEFT JOIN types as t ON tr.type_id = t.id
                     JOIN types as t2 ON r.primary_type = t2.id"""
+        
+        date_filter = """AND r.release_date > date('now', '-14 days') 
+                         AND r.release_date <= date('now', '+1 day')""" if format == 'rss' else ''
 
         if not skip_types:
             self.cursor.execute(bq)
         else:
             placeholders = ', '.join('?' for _ in skip_types)
             self.cursor.execute(f"""{bq} 
-                                WHERE t.name NOT IN ({placeholders})
-                                OR t.name ISNULL""", 
+                                WHERE (t.name NOT IN ({placeholders})
+                                OR t.name ISNULL) 
+                                {date_filter}""", 
                                 skip_types)
         
-        return self.cursor.fetchall()
-    
-    def artist_id(self, mbid):
-        self.cursor.execute('SELECT id FROM artists WHERE mbid = ?', (mbid,))
-        return self.cursor.fetchone()
-    
-    def release_id(self, mbid):
-        self.cursor.execute('SELECT id FROM releases WHERE mbid = ?', (mbid,))
-        return self.cursor.fetchone()
-    
-    def artist_name(self, id):
-        self.cursor.execute('SELECT name FROM artists WHERE id = ?', (id,))
-        return self.cursor.fetchone()
-    
-    def type_id(self, type):
-        self.cursor.execute('SELECT id FROM types WHERE name = ?', (type,))
-        return self.cursor.fetchone()
-    
-    def add_artist(self, artist: Artist):
-        self.cursor.execute("""INSERT INTO artists(mbid, name, disambiguation)
-                            VALUES (?, ?, ?)""",
-                            (artist.mbid, 
-                             artist.name, 
-                             artist.disambiguation))
-        self.conn.commit()
-
-    def add_release(self, release: Release):
-        self.cursor.execute("""INSERT INTO releases(mbid, artist_mbid, title,
-                                                    release_date, last_updated,
-                                                    primary_type) 
-                            VALUES (?, ?, ?, ?, ?, ?)""", 
-                            (release.mbid,
-                             release.artist,
-                             release.title,
-                             release.date,
-                             release.last_updated,
-                             release.type))
-        self.conn.commit()
-
-        return self.cursor.lastrowid
-
-    def add_type_release(self, type_id, release_id):
-        self.cursor.execute("""INSERT INTO types_releases(type_id, release_id)
-                            VALUES (?, ?)""", 
-                            (type_id, 
-                             release_id))
-        self.conn.commit()
-
-    def releases_types(self, type_id, release_id):
-        self.cursor.execute("""SELECT name FROM types 
-                                JOIN types_releases ON types.id = types_releases.type_id 
-                                    WHERE type_id = ?
-                                    AND release_id = ?""", 
-                                (type_id, 
-                                 release_id))
-        return self.cursor.fetchall()
-    
-    def release_types(self, release_id):
-        self.cursor.execute("""SELECT name FROM types 
-                                JOIN types_releases ON types.id = types_releases.type_id 
-                                    WHERE release_id = ?""", 
-                                (release_id,))
-        return self.cursor.fetchall()
-    
-    def type_name(self, type_id):
-        self.cursor.execute('SELECT type FROM types WHERE id = ?', (type_id,))
-        return self.cursor.fetchone()
-    
-    def close(self):
-        self.conn.close()
+        return self.cursor.fetchall() '''

@@ -1,15 +1,16 @@
-from release import Release
-from ext import logger
 from datetime import datetime as dt
+from ext import logger
 from db.db_handler import DBHandler as DBH
 
 class IcalBuilder:
 
-    prepend = 'BEGIN:VCALENDAR\nVERSION:2.0\nMETHOD:PUBLISH\nPRODID:-//hacksw/handcal//NONSGML v1.0//EN\n'
-    append = 'END:VCALENDAR\n'
+    _prepend = 'BEGIN:VCALENDAR\nVERSION:2.0\nMETHOD:PUBLISH\nPRODID:-//hacksw/handcal//NONSGML v1.0//EN\n'
+    _append = 'END:VCALENDAR\n'
 
-    def __init__(self, template_path):
+    def __init__(self, db: DBH, template_path):
+        self.db = db
         self.template = self._load_template(template_path)
+        self.ical = self._prepend
 
     def _db_to_ical(self, date: str):
         return dt.strptime(date, '%Y-%m-%d').strftime('%Y%m%d')
@@ -21,29 +22,39 @@ class IcalBuilder:
         with open(template_path) as file:
             return file.read()
         
-    def build_ical(self, db: DBH, output_path: str, skip_types=[]):
-        with open(output_path, 'w') as file:
-            file.write(self.prepend)
+    def build_ical(self, skip_types=[]):
 
-            for event in db.ical_releases(skip_types):
-                
-                logger.debug('Event: ' + str(event))
-
-                id, mbid, aid, title, date, pt, = event
-
-                aname, = db.artist_name(aid)
-
-                other_types = [t for t, in db.release_types(id)]
-
-                release_type = pt if not other_types else ' ('.join(other_types).join(')')
-
-                entry = self.template.format(name=title,
-                                                 artist=aname,
-                                                 uid=mbid,
-                                                 date=self._db_to_ical(date),
-                                                 categories=pt,
-                                                 type=release_type)
-                logger.debug('Writing event: ' + entry)
-                file.write(entry)
-            file.write(self.append)
+        for event in self.db.file_releases(skip_types, 'ics'):
             
+            logger.debug('Event: ' + str(event))
+
+            id, mbid, aid, title, date, pt, = event
+            date = self._db_to_ical(date)
+
+            aname, = self.db.fetchone('artists', 'name', 'mbid = ?', (aid))
+
+            j = [{'table': 'types', 
+                    'condition': 'types.id = types_releases.type_id'}]
+            w = [{'condition': 'release_id = ?', 
+                    'params': id}]
+
+            ot = [t for t, in self.db.fetchone('types', 'name', j, w)]
+
+            if not ot:
+                rt = pt
+            else:
+                rt = '(' + ', '.join(ot) + ')'
+
+            entry = self.template.format(name=title,
+                                                artist=aname,
+                                                uid=mbid,
+                                                date=date,
+                                                categories=pt,
+                                                type=rt)
+            logger.debug('Writing event: ' + entry)
+            self.ical += entry
+        self.ical += self._append
+            
+    def save(self, filename: str):
+        with(open(filename, 'w')) as file:
+            file.write(self.ical)
