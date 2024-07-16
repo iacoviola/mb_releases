@@ -32,8 +32,8 @@ class QueryBuilder:
         return self
     
     def build(self, distinct=False):
-        query = f'SELECT {"" if not distinct else "DISTINCT"} 
-                         {self._select} FROM {self._table}'
+        query = f"""SELECT {"" if not distinct else "DISTINCT"} 
+                         {self._select} FROM {self._table}"""
         if self._join:
             query += ' ' + ' '.join(self._join)
         if self._where:

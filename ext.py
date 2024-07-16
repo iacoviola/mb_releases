@@ -3,7 +3,8 @@ from configparser import ConfigParser
 import argparse
 import datetime
 
-config = ConfigParser().read('config.ini')
+config = ConfigParser()
+config.read('config.cfg')
 
 argparser = argparse.ArgumentParser(description='Import artists from a file and get new releases')
 argparser.add_argument('-f', '--file', 
@@ -22,7 +23,7 @@ argparser.add_argument('-t', '--type',
 
 args = argparser.parse_args()
 
-level = logging.DEBUG if args.verbose else logging.WARNING
+level = logging.DEBUG if args.verbose else logging.INFO
 
 logging.basicConfig(level=level)
     

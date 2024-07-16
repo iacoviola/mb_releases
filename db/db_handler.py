@@ -1,6 +1,6 @@
 import sqlite3
 from ext import logger
-from query_builder import QueryBuilder as QB
+from db.query_builder import QueryBuilder as QB
 
 class DBHandler:
 
@@ -43,15 +43,23 @@ class DBHandler:
                                          joins, 
                                          condition)
         self.cursor.execute(query, params)
+        logger.debug(query)
         return self.cursor.fetchone()
-    
+        
     def insert(self, table, columns=(), values=()):
-        if len(columns) != len(values):
+        lc = len(columns)
+        lv = len(values)
+        
+        if lc == 0:
+            logger.debug('No columns provided, inserting all values')
+        elif lc != lv:
             raise ValueError('Columns and values must have the same length')
         
         query = f"""INSERT INTO {table} 
-                    ({"" if not columns else ", ".join(columns)}) 
+                    {"" if not columns else "(" + ", ".join(columns) + ")"}
                          VALUES ({", ".join(["?" for _ in values])})"""
+        
+        logger.debug(query)
         
         self.cursor.execute(query, values)
         self.conn.commit()
@@ -59,11 +67,14 @@ class DBHandler:
         return self.cursor.lastrowid
     
     def update(self, table, columns, values, condition, params=()):
-        if len(columns) != len(values):
-            raise ValueError('Columns and values must have the same length')
-        
-        if len(columns) == 0:
+        lc = len(columns)
+        lv = len(values)
+
+        if lc == 0:
             raise ValueError('Columns must have at least one element')
+        
+        if lc != lv:
+            raise ValueError('Columns and values must have the same length')
         
         query = f'UPDATE {table} SET {", ".join([f"{c} = ?" for c in columns])} WHERE {condition}'
         self.cursor.execute(query, values + params)
@@ -83,8 +94,8 @@ class DBHandler:
         qb.join('types AS t2', 'r.primary_type = t2.id')
 
         if skip_types:
-            qb.where(f'(t.name NOT IN ({", ".join(["?" for _ in skip_types])})
-                        OR t.name ISNULL)', skip_types)
+            qb.where(f"""(t.name NOT IN ({", ".join(["?" for _ in skip_types])})
+                        OR t.name ISNULL)""", skip_types)
             
         if format == 'rss':
             qb.where('r.release_date > date("now", "-14 days")')

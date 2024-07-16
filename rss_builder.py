@@ -34,21 +34,23 @@ class RSSBuilder:
             id, mbid, aid, tit, date, pt, = event
             date = dt.strptime(date, '%Y-%m-%d')
 
-            aname, = self.db.fetchone('artists', 'name', 'mbid = ?', (aid))
+            aname, = self.db.fetchone('artists', 'name', condition=
+                                      [{'condition': 'id = ?', 
+                                        'params': (aid,)}])
 
-            j = [{'table': 'types', 
+            j = [{'table': 'types_releases', 
                   'condition': 'types.id = types_releases.type_id'}]
             w = [{'condition': 'release_id = ?', 
-                  'params': id}]
+                  'params': (id,)}]
 
-            ot = [t for t, in self.db.fetchone('types', 'name', j, w)]
+            ot = self.db.fetchone('types', 'name', j, w)
 
             if not ot:
                 rt = ""
             else:
                 rt = '(' + ', '.join(ot) + ')'
 
-            self.add_item(mbid, aname, tit, date, pt, rt)
+            self._add_item(mbid, aname, tit, date, pt, rt)
 
 
     def _add_item(self, mbid: str, aname: str, 
@@ -56,19 +58,22 @@ class RSSBuilder:
         
         item = SubElement(self.channel, 'item')
         SubElement(item, 'title').text = f'{aname} - {title}'
-        SubElement(item, 'link').text = self._b_item_d.format(mbid=mbid)
+        SubElement(item, 'link').text = self._b_item_l.format(mbid=mbid)
+
+        d_rss = date.strftime('%a, %d %b')
 
         SubElement(item, 'description').text = self._b_item_d.format(name=aname,
                                                                      pt=pt,
                                                                      ot=rt,
-                                                                     date=date)
+                                                                     date=d_rss)
 
         date = date.strftime(self._d_fmt)
 
         SubElement(item, 'pubDate').text = date
         SubElement(item, 'guid').text = f'{mbid}'
         SubElement(item, 'author').text = f'{aname}'
-        SubElement(item, 'category').text = f'{pt}({rt})'
+        SubElement(item, 'category').text = f'{pt}{"(" + rt + ")" if rt 
+                                                                  else ""}'
          
 
     def save(self, filename: str):

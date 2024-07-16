@@ -1,6 +1,6 @@
 from mb import MBR
 import datetime as dt
-from ext import logger, args
+from ext import logger, args, now
 from ical_builder import IcalBuilder as ICB
 from rss_builder import RSSBuilder as RSB
 from db.db_handler import DBHandler as DBH
@@ -10,6 +10,8 @@ artists_path = 'parsed_artists.txt'
 db = DBH('db/music.db')
 
 imp = True if args.file else False
+
+ts_fmt = '%Y-%m-%d %H:%M:%S'
 
 def load_lines(filepath):
     with open(filepath) as file:
@@ -48,11 +50,17 @@ def import_artists(filepath):
     for artist in new_artists:
         logger.info('Handling artist: ' + artist)
         res = handle_artist(artist)
-        if res and not db.fetchone('artists', 'id', 'mbid = ?', (res.mbid)):
-            db.insert('artists', values=res)
-            logger.info('Added artist: ' + artist)
+        if res:
+            if not db.fetchone('artists', 'id', condition=
+                               [{'condition': 'mbid = ?',  
+                                 'params': (res[0],)}]):
+                
+                db.insert('artists', values=res)
+                logger.info('Added artist: ' + artist)
+            else:
+                logger.info('Artist already in the database: ' + artist)
         else:
-            logger.info('Artist already in the database: ' + artist)
+            logger.warning('Could not find artist: ' + artist)
 
 def get_new_releases():
 
@@ -80,12 +88,20 @@ def get_new_releases():
             rd = r['first-release-date']
             tit = r['title']
 
-            tid, = db.fetchone('types', 'id', 'name = ?', (pt))
+            tid, = db.fetchone('types', 'id', condition=
+                               [{'condition': 'name = ?',
+                                 'params': (pt,)}])
             #tid, = db.type_id(pt)
-            orid = db.fetchone('releases', 'id', 'mbid = ?', (rmbid))
+            orid = db.fetchone('releases', 'id', condition=
+                               [{'condition': 'mbid = ?',
+                                 'params': (rmbid,)}])
             #orid = db.release_id(rmbid)
             if not orid:
-                rid = db.insert('releases', values=(rmbid, rd, id, tit, tid))
+                rid = db.insert('releases',
+                                columns=('mbid', 'artist_mbid', 'title',
+                                         'release_date', 'last_updated',
+                                         'primary_type'),
+                                values=(rmbid, id, tit, rd, now(ts_fmt), tid))
                 #rid = db.add_release(Release(rmbid, rd, id, tit, tid))
                 logger.info('Added release: ' + tit)
 
@@ -94,13 +110,15 @@ def get_new_releases():
                 logger.info('Release already in the database: ' + tit)
 
             for type in st:
-                stid, = db.fetchone('types', 'id', 'name = ?', (type))
+                stid, = db.fetchone('types', 'id', condition=
+                                    [{'condition': 'name = ?',
+                                      'params': (type,)}])
                 #if not db.releases_types(stid, rid):
 
                 j = [{'table': 'types_releases',
                         'condition': 'types.id = types_releases.type_id'}]
-                w = [{'condition': 'type_id = ?', 'params': stid},
-                     {'condition': 'release_id = ?', 'params': rid}]
+                w = [{'condition': 'type_id = ?', 'params': (stid,)},
+                     {'condition': 'release_id = ?', 'params': (rid,)}]
 
                 if not db.fetchone('types', 'id', j, w):
                     #db.add_type_release(stid, rid)
@@ -123,9 +141,9 @@ if __name__ == '__main__':
         builder.build_ical(skip_rt)
         builder.save('out/new_releases.ics')
     else:
-        builder = RSB()
-        builder.generate_feed(db, skip_rt)
-        #builder.save('out/new_releases.rss')
+        builder = RSB(db)
+        builder.generate_feed(skip_rt)
+        builder.save('out/new_releases.rss')
         builder.save('/var/www/music_ical/new_releases.rss')
 
     db.close()

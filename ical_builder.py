@@ -4,8 +4,12 @@ from db.db_handler import DBHandler as DBH
 
 class IcalBuilder:
 
-    _prepend = 'BEGIN:VCALENDAR\nVERSION:2.0\nMETHOD:PUBLISH\nPRODID:-//hacksw/handcal//NONSGML v1.0//EN\n'
-    _append = 'END:VCALENDAR\n'
+    _prepend = """BEGIN:VCALENDAR
+                  VERSION:2.0
+                  METHOD:PUBLISH
+                  PRODID:-//hacksw/handcal//NONSGML v1.0//EN
+                  """
+    _append = 'END:VCALENDAR'
 
     def __init__(self, db: DBH, template_path):
         self.db = db
@@ -31,14 +35,16 @@ class IcalBuilder:
             id, mbid, aid, title, date, pt, = event
             date = self._db_to_ical(date)
 
-            aname, = self.db.fetchone('artists', 'name', 'mbid = ?', (aid))
+            aname, = self.db.fetchone('artists', 'name', condition=
+                                      [{'condition': 'id = ?', 
+                                        'params': (aid,)}])
 
-            j = [{'table': 'types', 
+            j = [{'table': 'types_releases', 
                     'condition': 'types.id = types_releases.type_id'}]
             w = [{'condition': 'release_id = ?', 
-                    'params': id}]
+                    'params': (id,)}]
 
-            ot = [t for t, in self.db.fetchone('types', 'name', j, w)]
+            ot = self.db.fetchone('types', 'name', j, w)
 
             if not ot:
                 rt = pt
