@@ -2,6 +2,9 @@ import logging
 from configparser import ConfigParser
 import argparse
 import datetime
+from os import chdir
+
+chdir('/home/emiliano/Desktop/mb_releases')
 
 config = ConfigParser()
 config.read('config.cfg')

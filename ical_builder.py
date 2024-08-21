@@ -1,5 +1,7 @@
 from datetime import datetime as dt
+from time import time
 from ext import logger
+import os
 from db.db_handler import DBHandler as DBH
 
 class IcalBuilder:
@@ -64,3 +66,7 @@ class IcalBuilder:
     def save(self, filename: str):
         with(open(filename, 'w')) as file:
             file.write(self.ical)
+
+        os.utime(filename, (time(), time()))
+
+        logger.info('File saved: ' + filename)

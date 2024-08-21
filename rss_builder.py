@@ -7,7 +7,7 @@ class RSSBuilder:
     
     _b_item_d = "{name} is releasing a new {pt}{ot} on {date}"
     _b_item_l = "https://musicbrainz.org/release-group/{mbid}"
-    _d_fmt = '%a, %d %b %Y %H:%M:%S +0000'
+    _d_fmt = '%a, %d %b %Y %H:%M:%S +0200'
 
     def __init__(self, db: DBH):
         self.db = db
@@ -68,18 +68,20 @@ class RSSBuilder:
                                                                      date=d_rss)
 
         date = date.strftime(self._d_fmt)
+        
 
         SubElement(item, 'pubDate').text = date
-        SubElement(item, 'guid').text = f'{mbid}'
-        SubElement(item, 'author').text = f'{aname}'
+        SubElement(item, 'guid', {'isPermaLink': 'false'}).text = f'{mbid}'
+        #SubElement(item, 'author').text = f'{aname}'
         SubElement(item, 'category').text = f'{pt}{"(" + rt + ")" if rt 
                                                                   else ""}'
-         
 
     def save(self, filename: str):
         self.channel.find('pubDate').text = now(self._d_fmt)
 
         with open(filename, 'w') as file:
             file.write(tostring(self.root).decode('utf-8'))
+
+        logger.info('Feed saved to ' + filename)
 
 

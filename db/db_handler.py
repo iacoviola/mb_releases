@@ -99,12 +99,27 @@ class DBHandler:
             
         if format == 'rss':
             qb.where('r.release_date > date("now", "-14 days")')
-            qb.where('r.release_date <= date("now", "+1 day")')
+            qb.where('r.release_date <= date("now", "+7 day")')
+
+        qb.order_by('r.release_date, r.title')
 
         query, params = qb.build()
         logger.debug(query)
         self.cursor.execute(query, params)
         return self.cursor.fetchall()
+    
+        '''
+        SELECT DISTINCT r.id, mbid, artist_mbid, title, release_date, t2.name
+            FROM releases as r
+                LEFT JOIN types_releases as tr ON r.id = tr.release_id
+                LEFT JOIN types as t ON tr.type_id = t.id
+                JOIN types as t2 ON r.primary_type = t2.id
+            WHERE (t.name NOT IN ('Album', 'Single', 'EP', 'Compilation', 'Live', 'Soundtrack', 'Remix', 'Bootleg', 'Demo', 'Mixtape', 'DJ-mix', 'Interview', 'Spokenword', 'Audiobook', 'Audio drama', 'Other', 'Unknown')
+                OR t.name ISNULL)
+                AND r.release_date > date('now', '-14 days')
+                AND r.release_date <= date('now', '+1 day')
+            ORDER BY r.release_date, r.title ASC
+        '''
         
         
         '''

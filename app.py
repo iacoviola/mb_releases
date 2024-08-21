@@ -55,7 +55,9 @@ def import_artists(filepath):
                                [{'condition': 'mbid = ?',  
                                  'params': (res[0],)}]):
                 
-                db.insert('artists', values=res)
+                db.insert('artists', 
+                          columns=('mbid', 'name', 'disambiguation'), 
+                          values=res)
                 logger.info('Added artist: ' + artist)
             else:
                 logger.info('Artist already in the database: ' + artist)
