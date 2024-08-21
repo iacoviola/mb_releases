@@ -7,14 +7,27 @@ from db.db_handler import DBHandler as DBH
 
 artists_path = 'parsed_artists.txt'
 
-db = DBH('db/music.db')
+ref = config['SETTINGS']['a_refresh']
+ref_t = config['SETTINGS']['a_refresh_time']
+
+ics_path = config['PATHS']['ics'].split(',')
+if ics_path == ['']:
+    logger.warning('No path for the ics file was specified, the file will not be saved')
+
+rss_path = config['PATHS']['rss'].split(',')
+if rss_path == ['']:
+    logger.warning('No path for the rss file was specified, the file will not be saved')
+
+db_path = config['PATHS']['db']
+if not db_path:
+    logger.error('No path for the database was specified')
+    exit(1)
+
+db = DBH(db_path)
 
 imp = True if args.file else False
 
 ts_fmt = '%Y-%m-%d %H:%M:%S'
-
-ref = config['SETTINGS']['a_refresh']
-ref_t = config['SETTINGS']['a_refresh_time']
     
 def parse_refresh_time(conf_time):
     t = {}
@@ -195,11 +208,12 @@ if __name__ == '__main__':
     if args.type == 'ics':
         builder = ICB(db, 'templates/event.ics')
         builder.build_ical(skip_rt)
-        builder.save('out/new_releases.ics')
+        for path in ics_path:
+            builder.save(path)
     else:
         builder = RSB(db)
         builder.generate_feed(skip_rt)
-        builder.save('out/new_releases.rss')
-        builder.save('/var/www/music_ical/new_releases.rss')
+        for path in rss_path:
+            builder.save(path)
 
     db.close()

@@ -30,6 +30,38 @@ source venv/bin/activate.fish
 pip install -r requirements.txt 
 ```
 
+## SQLite
+
+The program needs an **sqlite** database to store the artists and their releases, you can create it by installing the sqlite package for your system:
+
+```bash
+#Ubuntu:
+sudo apt install sqlite3
+
+#Fedora:
+sudo dnf install sqlite
+
+#Arch:
+sudo pacman -S sqlite
+
+#MacOS with Homebrew:
+brew install sqlite
+
+#Windows with Chocolatey:
+choco install sqlite
+
+#Windows with winget:
+winget install sqlite.sqlite
+```
+
+Then create the database:
+
+> Alternatively, you can use the already esisting `music.db` empty database in the project folder.
+
+```bash
+sqlite3 /path/to/mb_releases/db/your_db.db < /path/to/mb_releases/db/music.sql
+```
+
 ## Usage
 
 - Fill the `artists.txt` file with the name of the artists you want to track (**one per line**). Most of the time, the program will automatically find the correct artist, but sometimes you will need to specify the artist from the list of suggestions.

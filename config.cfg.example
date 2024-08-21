@@ -3,3 +3,7 @@ mail=#your mail to notify musicbrainz about your identity
 [SETTINGS]
 a_refresh=#True|t or False|f
 a_refresh_time=#3d4h50m
+[PATHS]
+rss=/path/to/mb_releases/out/file.rss #you can output multiple rss files separated by comma
+ics=/path/to/mb_releases/out/file.ics #you can output multiple ics files separated by comma
+db=/path/to/mb_releases/db/music.db

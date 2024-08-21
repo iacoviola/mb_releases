@@ -50,4 +50,6 @@ VALUES
     (14, 'DJ-mix'),
     (15, 'Other');
 
+ALTER TABLE 'artists' ADD COLUMN 'last_updated' TIMESTAMP DEFAULT NULL;
+
 COMMIT;
