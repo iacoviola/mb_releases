@@ -88,7 +88,7 @@ def get_new_releases(force, a_ref):
     if force:
         logger.info('Forcing refresh of all artists')
         artists = db.fetchall('artists', ['id', 'mbid', 'name'],
-                              order_by={'columns': ['last_updated'], 
+                              order_by={'columns': ('last_updated',), 
                                          'order': 'DESC'})
     elif a_ref > 0:
         logger.info('Getting artists that need to be refreshed')
@@ -97,7 +97,7 @@ def get_new_releases(force, a_ref):
                               wheres=[{'condition': """last_updated ISNULL OR 
                                                        last_updated + ? < ?""",
                                        'params': (a_ref, int(now('%s')))}],
-                              order_by={'columns': ['last_updated'], 
+                              order_by={'columns': ('last_updated',), 
                                          'order': 'DESC'})
         if not artists:
             logger.info('No artists need to be refreshed')

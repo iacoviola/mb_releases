@@ -123,7 +123,7 @@ class DBHandler:
             qb.where('r.release_date > date("now", "-14 days")')
             qb.where('r.release_date <= date("now", "+7 day")')
 
-        qb.order_by(['r.release_date', 'r.title'])
+        qb.order_by(('r.release_date', 'r.title'))
 
         query, params = qb.build_s()
         logger.debug(query)

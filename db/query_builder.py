@@ -30,9 +30,9 @@ class QueryBuilder:
             self._select = columns
         return self
     
-    def set(self, columns, values):
+    def set(self, columns, values=()):
         self._select = columns
-        self._values = values
+        self._values.extend(values)
         return self
     
     def table(self, table):
@@ -55,4 +55,4 @@ class QueryBuilder:
         if self._where:
             query += ' WHERE ' + ' AND '.join(self._where)
         
-        return query, self._values + tuple(self._params)
+        return query, self._values + self._params
