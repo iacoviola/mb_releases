@@ -56,17 +56,17 @@ winget install sqlite.sqlite
 
 Then create the database:
 
-> Alternatively, you can use the already esisting `music.db` empty database in the project folder.
-
 ```bash
 sqlite3 /path/to/mb_releases/db/your_db.db < /path/to/mb_releases/db/music.sql
 ```
+
+> Alternatively, you can use the already esisting `music.db` empty database in the project folder.
 
 ## Usage
 
 - Fill the `artists.txt` file with the name of the artists you want to track (**one per line**). Most of the time, the program will automatically find the correct artist, but sometimes you will need to specify the artist from the list of suggestions.
 
-- Sometimes an artist's release type might not interest you, you can filter them out by adding the release type you **don't** want to track to the `skip_releases.txt` list in the `config.cfg` file (all available releases are listed int the file `available_releases.txt`). By default the program will track the following release types: `Album`, `Single`, `EP`.
+- Sometimes an artist's release type might not interest you, you can filter them out by adding the release type you **don't** want to track to the `skip_releases.txt` file (all available release types are listed in the file `available_releases.txt`). By default the program will track the following release types: `Album`, `Single`, `EP`.
 - Run the program:
 
 ```bash
