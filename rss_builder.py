@@ -73,8 +73,7 @@ class RSSBuilder:
         SubElement(item, 'pubDate').text = date
         SubElement(item, 'guid', {'isPermaLink': 'false'}).text = f'{mbid}'
         #SubElement(item, 'author').text = f'{aname}'
-        SubElement(item, 'category').text = f'{pt}{"(" + rt + ")" if rt 
-                                                                  else ""}'
+        SubElement(item, 'category').text = f'{pt}{"(" + rt + ")" if rt else ""}'
 
     def save(self, filename: str):
         self.channel.find('pubDate').text = now(self._d_fmt)

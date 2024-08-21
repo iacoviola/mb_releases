@@ -1,3 +1,6 @@
+Album
+Single
+EP
 Broadcast
 Compilation
 Soundtrack
