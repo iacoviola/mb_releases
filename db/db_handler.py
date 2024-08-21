@@ -16,7 +16,8 @@ class DBHandler:
     def close(self):
         self.conn.close()
 
-    def _fetchbuild(self, table, columns='*', joins=None, wheres=None):
+    def _fetchbuild(self, table, columns='*', joins=None, wheres=None,
+                    order_by=None):
         qb = QB().select(columns).table(table)
         if joins:
             for join in joins:
@@ -26,22 +27,32 @@ class DBHandler:
         if wheres:
             for where in wheres:
                 qb.where(where['condition'], where['params'])
-        return qb.build()
 
-    def fetchall(self, table, columns='*', joins=None, wheres=None):
+        if order_by:
+                qb.order_by(order_by['columns'],
+                            order_by['direction'] 
+                                if 'direction' in order_by 
+                                else 'ASC')
+        return qb.build_s()
+
+    def fetchall(self, table, columns='*', joins=None, wheres=None,
+                 order_by=None):
         query, params = self._fetchbuild(table, 
                                          columns, 
                                          joins, 
-                                         wheres)
+                                         wheres,
+                                         order_by)
         self.cursor.execute(query, params)
         return self.cursor.fetchall()
 
     
-    def fetchone(self, table, columns='*', joins=None, condition=None):
+    def fetchone(self, table, columns='*', joins=None, condition=None,
+                 order_by=None):
         query, params = self._fetchbuild(table, 
                                          columns, 
                                          joins, 
-                                         condition)
+                                         condition,
+                                         order_by)
         self.cursor.execute(query, params)
         logger.debug(query)
         return self.cursor.fetchone()
@@ -66,18 +77,29 @@ class DBHandler:
 
         return self.cursor.lastrowid
     
-    def update(self, table, columns, values, condition, params=()):
+    def update(self, table, columns=(), values=(), condition=None):
         lc = len(columns)
         lv = len(values)
+
+        if not condition:
+            raise ValueError('No condition provided')
 
         if lc == 0:
             raise ValueError('Columns must have at least one element')
         
         if lc != lv:
-            raise ValueError('Columns and values must have the same length')
+            raise ValueError('Columns and values must have the same length: ' + str(lc) + ' != ' + str(lv))
         
-        query = f'UPDATE {table} SET {", ".join([f"{c} = ?" for c in columns])} WHERE {condition}'
-        self.cursor.execute(query, values + params)
+        q = QB().table(table).set(columns, values)
+        
+        for where in condition:
+            q.where(where['condition'], where['params'])
+
+        query, params = q.build_u()
+
+        logger.debug(query)
+
+        self.cursor.execute(query, params)
         self.conn.commit()
 
     def delete(self, table, condition, params=()):
@@ -101,9 +123,9 @@ class DBHandler:
             qb.where('r.release_date > date("now", "-14 days")')
             qb.where('r.release_date <= date("now", "+7 day")')
 
-        qb.order_by('r.release_date, r.title')
+        qb.order_by(['r.release_date', 'r.title'])
 
-        query, params = qb.build()
+        query, params = qb.build_s()
         logger.debug(query)
         self.cursor.execute(query, params)
         return self.cursor.fetchall()

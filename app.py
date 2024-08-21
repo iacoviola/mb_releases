@@ -1,6 +1,6 @@
 from mb import MBR
 import datetime as dt
-from ext import logger, args, now
+from ext import logger, args, config, now
 from ical_builder import IcalBuilder as ICB
 from rss_builder import RSSBuilder as RSB
 from db.db_handler import DBHandler as DBH
@@ -12,6 +12,25 @@ db = DBH('db/music.db')
 imp = True if args.file else False
 
 ts_fmt = '%Y-%m-%d %H:%M:%S'
+
+ref = config['SETTINGS']['a_refresh']
+ref_t = config['SETTINGS']['a_refresh_time']
+    
+def parse_refresh_time(conf_time):
+    t = {}
+    tn = ''
+    for c in conf_time:
+        if c.isdigit():
+            tn += c
+        elif c in ('d', 'h', 'm'):
+            t[c] = int(tn)
+            tn = ''
+        elif c in (' ', '\t'):
+            continue
+        else:
+            raise ValueError("Invalid character in refresh time: '" + c + "'")
+    return t.get('d', 0) * 86400 + t.get('h', 0) * 3600 + t.get('m', 0) * 60
+
 
 def load_lines(filepath):
     with open(filepath) as file:
@@ -64,11 +83,31 @@ def import_artists(filepath):
         else:
             logger.warning('Could not find artist: ' + artist)
 
-def get_new_releases():
+def get_new_releases(force, a_ref):
 
-    artists = db.fetchall('artists', ['id', 'mbid', 'name'])
+    if force:
+        logger.info('Forcing refresh of all artists')
+        artists = db.fetchall('artists', ['id', 'mbid', 'name'],
+                              order_by={'columns': ['last_updated'], 
+                                         'order': 'DESC'})
+    elif a_ref > 0:
+        logger.info('Getting artists that need to be refreshed')
+        artists = db.fetchall('artists', 
+                              ['id', 'mbid', 'name'], 
+                              wheres=[{'condition': """last_updated ISNULL OR 
+                                                       last_updated + ? < ?""",
+                                       'params': (a_ref, int(now('%s')))}],
+                              order_by={'columns': ['last_updated'], 
+                                         'order': 'DESC'})
+        if not artists:
+            logger.info('No artists need to be refreshed')
+            return
+    else:
+        logger.info('No artists will be refreshed')
+        return
 
     for id, mbid, name in artists:
+
         logger.info('Getting releases for ' + name)
 
         offset = 0
@@ -125,6 +164,12 @@ def get_new_releases():
                 if not db.fetchone('types', 'id', j, w):
                     #db.add_type_release(stid, rid)
                     db.insert('types_releases', values=(stid, rid))
+        
+        db.update('artists', 
+                  columns=('last_updated',),
+                  values=(now('%s'),), 
+                  condition=[{'condition': 'id = ?', 
+                              'params': (id,)}])
 
 
 if __name__ == '__main__':
@@ -133,8 +178,17 @@ if __name__ == '__main__':
     if imp:
         import_artists(args.file)
 
-    if args.refresh:
-        get_new_releases()
+    if ref in ('True', 'true', 't', 'T'):
+        try:
+            ts = parse_refresh_time(ref_t)
+            logger.debug('Refresh time: ' + str(ts))
+        except ValueError as e:
+            logger.error(e + ', the refresh will still be performed if the -r flag was specified')
+            ts = -1
+    else:
+        ts = -1
+
+    get_new_releases(force=args.refresh, a_ref=ts)
 
     skip_rt = load_lines('skip_release.txt')
 
