@@ -30,7 +30,7 @@ class IcalBuilder:
         
     def build_ical(self, skip_types=[]):
 
-        for event in self.db.file_releases(skip_types, 'ics'):
+        for event in self.db.get_releases(skip_types):
             
             logger.debug('Event: ' + str(event))
 

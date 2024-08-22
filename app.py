@@ -3,12 +3,16 @@ import datetime as dt
 from ext import logger, args, config, now
 from ical_builder import IcalBuilder as ICB
 from rss_builder import RSSBuilder as RSB
+from notifier import Notifier
 from db.db_handler import DBHandler as DBH
 
 artists_path = 'parsed_artists.txt'
 
-ref = config['SETTINGS']['a_refresh']
+ref = config.getboolean('SETTINGS', 'a_refresh')
 ref_t = config['SETTINGS']['a_refresh_time']
+
+tg_id = config['SETTINGS']['tg_id']
+tg_token = config['SETTINGS']['tg_token']
 
 ics_path = config['PATHS']['ics'].split(',')
 if ics_path == ['']:
@@ -100,24 +104,22 @@ def get_new_releases(force, a_ref):
 
     if force:
         logger.info('Forcing refresh of all artists')
-        artists = db.fetchall('artists', ['id', 'mbid', 'name'],
-                              order_by={'columns': ('last_updated',), 
-                                         'order': 'DESC'})
+        wheres = []
     elif a_ref > 0:
         logger.info('Getting artists that need to be refreshed')
-        artists = db.fetchall('artists', 
-                              ['id', 'mbid', 'name'], 
-                              wheres=[{'condition': """last_updated ISNULL OR 
-                                                       last_updated + ? < ?""",
-                                       'params': (a_ref, int(now('%s')))}],
-                              order_by={'columns': ('last_updated',), 
-                                         'order': 'DESC'})
-        if not artists:
-            logger.info('No artists need to be refreshed')
-            return
+        wheres=[{'condition': """last_updated ISNULL OR 
+                                 last_updated + ? < ?""",
+                 'params': (a_ref, int(now('%s')))}]
     else:
         logger.info('No artists will be refreshed')
         return
+    
+    artists = db.fetchall('artists', ['id', 'mbid', 'name'], 
+                              wheres=wheres,
+                              order_by={'columns': ('last_updated',), 
+                                         'order': 'DESC'})
+    
+    logger.info('Found ' + str(len(artists)) + ' artists to refresh')
 
     for id, mbid, name in artists:
 
@@ -191,7 +193,7 @@ if __name__ == '__main__':
     if imp:
         import_artists(args.file)
 
-    if ref in ('True', 'true', 't', 'T'):
+    if ref:
         try:
             ts = parse_refresh_time(ref_t)
             logger.debug('Refresh time: ' + str(ts))
@@ -210,10 +212,19 @@ if __name__ == '__main__':
         builder.build_ical(skip_rt)
         for path in ics_path:
             builder.save(path)
-    else:
+    elif args.type == 'rss':
         builder = RSB(db)
         builder.generate_feed(skip_rt)
         for path in rss_path:
             builder.save(path)
+
+    if args.notify:
+        if not tg_id:
+            logger.error('No Telegram ID was provided, notifications will not be sent')
+        elif not tg_token:
+            logger.error('No Telegram token was provided, notifications will not be sent')
+        else:
+            notifier = Notifier(db, tg_id, tg_token)
+            notifier.notify(skip_rt)
 
     db.close()

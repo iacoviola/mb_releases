@@ -27,7 +27,7 @@ class RSSBuilder:
         SubElement(self.channel, 'lastBuildDate').text = now(self._d_fmt)
         SubElement(self.channel, 'pubDate').text = ""
 
-        for event in self.db.file_releases(skip_types, 'rss'):
+        for event in self.db.get_releases(skip_types, True):
                 
             logger.debug('Event: ' + str(event))
 

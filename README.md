@@ -75,12 +75,12 @@ python app.py -f artists.txt -t rss
 
 The first time you run the program, you need to specify the file you wish to import the artists from (`-f`).
 
-The output file type (`-t`) is always required and can be either `ics` or `rss`.
+The output file type (`-t`) is always required (unless `-n` is set) and can be either `ics` or `rss`.
 
 If you want to manually refresh the releases, you can use the `-r` flag.
 
 >Otherwise, the program will refresh the releases automatically **if** you fill the options `a_refresh` and `a_refresh_interval` in the `config.cfg` file.
->>The `a_refresh` option is either `True` or `False` and it enables the automatic refresh.
+>>The `a_refresh` option is either `true` or `false` and it enables the automatic refresh.
 The `a_refresh_interval` is the number of days, hours and minutes between each refresh.
 
 ```bash
@@ -95,7 +95,15 @@ options:
   -v, --verbose         Verbose output
   -t {ics,rss}, --type {ics,rss}
                         Output file format
+  -n, --notify          Notify new releases to telegram
 ```
+
+## Telegram Bot
+
+If you want to receive notifications on Telegram, you can do so by creating a telegram bot (use [@BotFather](https://t.me/botfather) to create one).
+Copy its token and paste it in the `config.cfg` file under the tg_token option.
+
+On top of this, you need to get your telegram user id, you can do so by messaging the bot [@myidbot](https://t.me/myidbot) and copying the id it gives you and pasting it in the `config.cfg` file under the tg_id option.
 
 ## Cron/Timer
 

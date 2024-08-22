@@ -21,8 +21,10 @@ argparser.add_argument('-v', '--verbose',
                        action='store_true')
 argparser.add_argument('-t', '--type', 
                        help='Output file format', 
-                       choices=['ics', 'rss'], 
-                       required=True)
+                       choices=['ics', 'rss'])
+argparser.add_argument('-n', '--notify',
+                       help='Notify new releases to telegram',
+                       action='store_true')
 
 args = argparser.parse_args()
 
@@ -31,6 +33,9 @@ level = logging.DEBUG if args.verbose else logging.INFO
 logging.basicConfig(level=level)
     
 logger = logging.getLogger(__name__)
+
+if not args.type and not args.notify:
+    argparser.error('No action requested, add -t or -n')
 
 def now(format='%Y-%m-%d'):
     return datetime.datetime.now().strftime(format)

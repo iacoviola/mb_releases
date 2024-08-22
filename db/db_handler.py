@@ -107,7 +107,7 @@ class DBHandler:
         self.cursor.execute(query, params)
         self.conn.commit()
 
-    def file_releases(self, skip_types=[], format='ics'):
+    def get_releases(self, skip_types=[], limit=False, notify=False):
 
         qb = QB().select(['r.id', 'mbid', 'artist_mbid', 'title', 'release_date', 't2.name'])
         qb.table('releases AS r')
@@ -119,11 +119,14 @@ class DBHandler:
             qb.where(f"""(t.name NOT IN ({", ".join(["?" for _ in skip_types])})
                         OR t.name ISNULL)""", skip_types)
             
-        if format == 'rss':
+        if limit:
             qb.where('r.release_date > date("now", "-14 days")')
             qb.where('r.release_date <= date("now", "+7 day")')
 
-        qb.order_by(('r.release_date', 'r.title'))
+        if notify:
+            qb.where('notified = 0')
+
+        qb.order_by(('r.release_date', 'r.title'), 'DESC' if notify else 'ASC')
 
         query, params = qb.build_s()
         logger.debug(query)
