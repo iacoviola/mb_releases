@@ -107,7 +107,9 @@ class DBHandler:
         self.cursor.execute(query, params)
         self.conn.commit()
 
-    def get_releases(self, skip_types=[], limit=False, notify=False):
+    def get_releases(self, skip_types=[], 
+                     d_past=-1, d_fut=-1,
+                     o_condition=None, order='ASC'):
 
         qb = QB().select(['r.id', 'mbid', 'artist_mbid', 'title', 'release_date', 't2.name'])
         qb.table('releases AS r')
@@ -118,15 +120,21 @@ class DBHandler:
         if skip_types:
             qb.where(f"""(t.name NOT IN ({", ".join(["?" for _ in skip_types])})
                         OR t.name ISNULL)""", skip_types)
-            
-        if limit:
-            qb.where('r.release_date > date("now", "-14 days")')
-            qb.where('r.release_date <= date("now", "+7 day")')
+        
+        d_past = -1 if d_past is None else d_past
+        d_fut = -1 if d_fut is None else d_fut
 
-        if notify:
-            qb.where('notified = 0')
+        if d_past >= 0:
+            qb.where('r.release_date >= date("now", ?)', (f'-{d_past} days',))
 
-        qb.order_by(('r.release_date', 'r.title'), 'DESC' if notify else 'ASC')
+        if d_fut >= 0:
+            qb.where('r.release_date <= date("now", ?)', (f'+{d_fut} days',))
+
+        if o_condition:
+            for cond in o_condition:
+                qb.where(cond['condition'], cond.get('params', ()))
+
+        qb.order_by(('r.release_date', 'r.title'), order)
 
         query, params = qb.build_s()
         logger.debug(query)

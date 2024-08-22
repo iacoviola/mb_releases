@@ -77,11 +77,20 @@ The first time you run the program, you need to specify the file you wish to imp
 
 The output file type (`-t`) is always required (unless `-n` is set) and can be either `ics` or `rss`.
 
+>If you choose the rss format there are two customizations available for it in the `config.cfg` file:
+>>the `d_past` option is the number of days in the past you want to see in the feed.
+The `d_future` option is the number of days in the future you want to see in the feed.
+If **none are set**, every release will be added to the feed.
+
 If you want to manually refresh the releases, you can use the `-r` flag.
 
 >Otherwise, the program will refresh the releases automatically **if** you fill the options `a_refresh` and `a_refresh_interval` in the `config.cfg` file.
 >>The `a_refresh` option is either `true` or `false` and it enables the automatic refresh.
 The `a_refresh_interval` is the number of days, hours and minutes between each refresh.
+
+If you want to receive notifications on Telegram, you can use the `-n` flag.
+
+> The program will notify you only if there are new releases, and it will not notify you if you run the program with the `-r` flag.
 
 ```bash
 usage: app.py [-h] [-f FILE] [-r] [-v] -t {ics,rss}
@@ -101,9 +110,9 @@ options:
 ## Telegram Bot
 
 If you want to receive notifications on Telegram, you can do so by creating a telegram bot (use [@BotFather](https://t.me/botfather) to create one).
-Copy its token and paste it in the `config.cfg` file under the tg_token option.
+Copy its token and paste it in the `config.cfg` file under the `tg_token` option.
 
-On top of this, you need to get your telegram user id, you can do so by messaging the bot [@myidbot](https://t.me/myidbot) and copying the id it gives you and pasting it in the `config.cfg` file under the tg_id option.
+On top of this, you need to get your telegram user id, you can do so by messaging the bot [@myidbot](https://t.me/myidbot) and copying the id it gives you and pasting it in the `config.cfg` file under the `tg_id` option.
 
 ## Cron/Timer
 

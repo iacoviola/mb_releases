@@ -14,6 +14,9 @@ ref_t = config['SETTINGS']['a_refresh_time']
 tg_id = config['SETTINGS']['tg_id']
 tg_token = config['SETTINGS']['tg_token']
 
+d_past = config.getint('SETTINGS', 'd_past')
+d_fut = config.getint('SETTINGS', 'd_fut')
+
 ics_path = config['PATHS']['ics'].split(',')
 if ics_path == ['']:
     logger.warning('No path for the ics file was specified, the file will not be saved')
@@ -214,7 +217,7 @@ if __name__ == '__main__':
             builder.save(path)
     elif args.type == 'rss':
         builder = RSB(db)
-        builder.generate_feed(skip_rt)
+        builder.generate_feed(skip_rt, d_past, d_fut)
         for path in rss_path:
             builder.save(path)
 

@@ -16,7 +16,7 @@ class RSSBuilder:
         self.description = 'A feed for your music releases'
         self.language = 'en-us'
 
-    def generate_feed(self, skip_types=[]):
+    def generate_feed(self, skip_types=[], d_past=-1, d_fut=-1):
 
         self.root = Element('rss', {'version': '2.0'})
         self.channel = SubElement(self.root, 'channel')
@@ -27,7 +27,7 @@ class RSSBuilder:
         SubElement(self.channel, 'lastBuildDate').text = now(self._d_fmt)
         SubElement(self.channel, 'pubDate').text = ""
 
-        for event in self.db.get_releases(skip_types, True):
+        for event in self.db.get_releases(skip_types, d_past, d_fut):
                 
             logger.debug('Event: ' + str(event))
 
