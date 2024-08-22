@@ -167,3 +167,5 @@ config.cfg
 music.db.old
 music.deb.db
 music-*.sql
+artists.txt.*
+class/
