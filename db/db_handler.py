@@ -88,7 +88,7 @@ class DBHandler:
             raise ValueError('Columns must have at least one element')
         
         if lc != lv:
-            raise ValueError('Columns and values must have the same length: ' + str(lc) + ' != ' + str(lv))
+            raise ValueError("Columns and values must have the same length: " + str(lc) + " != " + str(lv))
         
         q = QB().table(table).set(columns, values)
         
@@ -103,15 +103,20 @@ class DBHandler:
         self.conn.commit()
 
     def delete(self, table, condition, params=()):
-        query = f'DELETE FROM {table} WHERE {condition}'
+        query = f"DELETE FROM {table} WHERE {condition}"
         self.cursor.execute(query, params)
         self.conn.commit()
 
     def get_releases(self, skip_types=[], 
                      d_past=-1, d_fut=-1,
+                     add_cols=None,
                      o_condition=None, order='ASC'):
 
         qb = QB().select(['r.id', 'mbid', 'artist_mbid', 'title', 'release_date', 't2.name'])
+
+        if add_cols:
+            qb.select(add_cols)
+
         qb.table('releases AS r')
         qb.join('types_releases AS tr', 'r.id = tr.release_id', 'LEFT')
         qb.join('types AS t', 'tr.type_id = t.id', 'LEFT')
@@ -142,38 +147,50 @@ class DBHandler:
         return self.cursor.fetchall()
     
         '''
-        SELECT DISTINCT r.id, mbid, artist_mbid, title, release_date, t2.name
-            FROM releases as r
-                LEFT JOIN types_releases as tr ON r.id = tr.release_id
-                LEFT JOIN types as t ON tr.type_id = t.id
-                JOIN types as t2 ON r.primary_type = t2.id
-            WHERE (t.name NOT IN ('Album', 'Single', 'EP', 'Compilation', 'Live', 'Soundtrack', 'Remix', 'Bootleg', 'Demo', 'Mixtape', 'DJ-mix', 'Interview', 'Spokenword', 'Audiobook', 'Audio drama', 'Other', 'Unknown')
-                OR t.name ISNULL)
-                AND r.release_date > date('now', '-14 days')
-                AND r.release_date <= date('now', '+1 day')
-            ORDER BY r.release_date, r.title ASC
+        SELECT DISTINCT
+            r.id,
+            mbid,
+            artist_mbid,
+            title,
+            release_date,
+            t2.name,
+            last_notified,
+            last_updated
+        FROM
+            releases as r
+            LEFT JOIN types_releases as tr ON r.id = tr.release_id
+            LEFT JOIN types as t ON tr.type_id = t.id
+            JOIN types as t2 ON r.primary_type = t2.id
+        WHERE
+            (
+                t.name NOT IN (
+                    'Album',
+                    'Single',
+                    'EP',
+                    'Compilation',
+                    'Live',
+                    'Soundtrack',
+                    'Remix',
+                    'Bootleg',
+                    'Demo',
+                    'Mixtape',
+                    'DJ-mix',
+                    'Interview',
+                    'Spokenword',
+                    'Audiobook',
+                    'Audio drama',
+                    'Other',
+                    'Unknown'
+                )
+                OR t.name ISNULL
+            )
+            AND r.release_date > date ('now', '-14 days')
+            AND r.release_date <= date ('now', '+1 day')
+            AND (
+                last_notified IS NULL
+                OR last_notified < date (release_date - ?)
+            )
+        ORDER BY
+            r.release_date,
+            r.title ASC
         '''
-        
-        
-        '''
-        bq = """SELECT DISTINCT r.id, mbid, artist_mbid, title,          
-                                release_date, t2.name
-                    FROM releases as r
-                    LEFT JOIN types_releases as tr ON r.id = tr.release_id
-                    LEFT JOIN types as t ON tr.type_id = t.id
-                    JOIN types as t2 ON r.primary_type = t2.id"""
-        
-        date_filter = """AND r.release_date > date('now', '-14 days') 
-                         AND r.release_date <= date('now', '+1 day')""" if format == 'rss' else ''
-
-        if not skip_types:
-            self.cursor.execute(bq)
-        else:
-            placeholders = ', '.join('?' for _ in skip_types)
-            self.cursor.execute(f"""{bq} 
-                                WHERE (t.name NOT IN ({placeholders})
-                                OR t.name ISNULL) 
-                                {date_filter}""", 
-                                skip_types)
-        
-        return self.cursor.fetchall() '''

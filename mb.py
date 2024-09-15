@@ -34,9 +34,9 @@ class MBR:
             logger.debug('sleep 1s')
             time.sleep(1)
         
-        r_url += '?' + self._url_encode(kw) + '&fmt=json'
+        r_url += '?' + self._url_encode(kw) + "&fmt=json"
 
-        hdr = {'User-Agent': f'MusicBrainz Release Calendar/0.1 ({config["CREDS"]["mail"]})'}
+        hdr = {'User-Agent': f"MusicBrainz Release Calendar/0.1 ({config["CREDS"]["mail"]})"}
 
         request = requests.get(r_url, headers=hdr)
         logger.debug('Requesting ' + request.url)

@@ -2,6 +2,7 @@ BEGIN:VEVENT
 SUMMARY:{artist} - {name}
 UID:{uid}
 TRANSP:TRANSPARENT
+DTSTAMP:{tstamp}
 DTSTART;VALUE=DATE:{date}
 CATEGORIES:Music,{categories}
 DESCRIPTION:{artist} is releasing a new {type}:\n{name}

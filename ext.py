@@ -21,7 +21,7 @@ argparser.add_argument('-v', '--verbose',
                        action='store_true')
 argparser.add_argument('-t', '--type', 
                        help='Output file format', 
-                       choices=['ics', 'rss'])
+                       choices=['ics', 'rss', 'all'])
 argparser.add_argument('-n', '--notify',
                        help='Notify new releases to telegram',
                        action='store_true')

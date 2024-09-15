@@ -50,8 +50,18 @@ VALUES
     (14, 'DJ-mix'),
     (15, 'Other');
 
+-- First revision
 ALTER TABLE 'artists' ADD COLUMN 'last_updated' TIMESTAMP DEFAULT NULL;
 
+-- Second revision
 ALTER TABLE 'releases' ADD COLUMN 'notified' BOOLEAN DEFAULT FALSE;
+
+-- Third revision
+ALTER TABLE 'releases' ADD COLUMN 'last_notified' DATE DEFAULT NULL;
+
+UPDATE 'releases' SET 'last_notified' = '2024-09-07' WHERE 'notified' = 1;
+
+ALTER TABLE 'releases' DROP COLUMN 'notified';
+
 
 COMMIT;

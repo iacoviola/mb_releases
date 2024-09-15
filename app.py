@@ -5,6 +5,7 @@ from ical_builder import IcalBuilder as ICB
 from rss_builder import RSSBuilder as RSB
 from notifier import Notifier
 from db.db_handler import DBHandler as DBH
+import os
 
 artists_path = 'parsed_artists.txt'
 
@@ -16,6 +17,10 @@ tg_token = config['SETTINGS']['tg_token']
 
 d_past = config.getint('SETTINGS', 'd_past')
 d_fut = config.getint('SETTINGS', 'd_fut')
+
+n_days = config['SETTINGS']['notify_days']
+
+#perms = config['SETTINGS']['perms']
 
 ics_path = config['PATHS']['ics'].split(',')
 if ics_path == ['']:
@@ -210,12 +215,14 @@ if __name__ == '__main__':
 
     skip_rt = load_lines('skip_release.txt')
 
-    if args.type == 'ics':
+    if args.type == 'ics' or args.type == 'all':
         builder = ICB(db, 'templates/event.ics')
         builder.build_ical(skip_rt)
         for path in ics_path:
             builder.save(path)
-    elif args.type == 'rss':
+            
+    
+    if args.type == 'rss' or args.type == 'all':
         builder = RSB(db)
         builder.generate_feed(skip_rt, d_past, d_fut)
         for path in rss_path:
@@ -227,7 +234,7 @@ if __name__ == '__main__':
         elif not tg_token:
             logger.error('No Telegram token was provided, notifications will not be sent')
         else:
-            notifier = Notifier(db, tg_id, tg_token)
+            notifier = Notifier(db, tg_id, tg_token, n_days)
             notifier.notify(skip_rt)
 
     db.close()

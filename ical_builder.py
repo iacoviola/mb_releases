@@ -6,11 +6,7 @@ from db.db_handler import DBHandler as DBH
 
 class IcalBuilder:
 
-    _prepend = """BEGIN:VCALENDAR
-                  VERSION:2.0
-                  METHOD:PUBLISH
-                  PRODID:-//hacksw/handcal//NONSGML v1.0//EN
-                  """
+    _prepend = 'BEGIN:VCALENDAR\nVERSION:2.0\nMETHOD:PUBLISH\nPRODID:-//hacksw/handcal//NONSGML v1.0//EN\n'
     _append = 'END:VCALENDAR'
 
     def __init__(self, db: DBH, template_path):
@@ -30,12 +26,21 @@ class IcalBuilder:
         
     def build_ical(self, skip_types=[]):
 
-        for event in self.db.get_releases(skip_types):
+        for event in self.db.get_releases(skip_types, None, None,
+                                          ['last_updated']):
             
             logger.debug('Event: ' + str(event))
 
-            id, mbid, aid, title, date, pt, = event
+            id, mbid, aid, title, date, pt, lu = event
             date = self._db_to_ical(date)
+
+            try:
+                tstamp = dt.strptime(lu, '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                tstamp = dt.strptime(lu, '%Y-%m-%dT%H:%M:%S.%f')
+
+            tstamp = tstamp.strftime('%Y%m%dT%H%M%SZ')
+
 
             aname, = self.db.fetchone('artists', 'name', condition=
                                       [{'condition': 'id = ?', 
@@ -56,6 +61,7 @@ class IcalBuilder:
             entry = self.template.format(name=title,
                                                 artist=aname,
                                                 uid=mbid,
+                                                tstamp=tstamp,
                                                 date=date,
                                                 categories=pt,
                                                 type=rt)

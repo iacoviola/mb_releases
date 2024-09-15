@@ -8,6 +8,8 @@ class RSSBuilder:
     _b_item_d = "{name} is releasing a new {pt}{ot} on {date}"
     _b_item_l = "https://musicbrainz.org/release-group/{mbid}"
     _d_fmt = '%a, %d %b %Y %H:%M:%S +0200'
+    _link = 'http://iacohome.duckdns.org/music/new_releases.rss'
+    _xml_prolog = '<?xml version="1.0" encoding="UTF-8"?>'
 
     def __init__(self, db: DBH):
         self.db = db
@@ -19,7 +21,12 @@ class RSSBuilder:
     def generate_feed(self, skip_types=[], d_past=-1, d_fut=-1):
 
         self.root = Element('rss', {'version': '2.0'})
+        self.root.set('xmlns:atom', 'http://www.w3.org/2005/Atom')
         self.channel = SubElement(self.root, 'channel')
+        SubElement(self.channel, 'atom:link', 
+                   {'href': self._link,
+                    'rel': 'self',
+                    'type': 'application/rss+xml'})
         SubElement(self.channel, 'title').text = self.title
         SubElement(self.channel, 'link').text = self.link
         SubElement(self.channel, 'description').text = self.description
@@ -31,7 +38,7 @@ class RSSBuilder:
                 
             logger.debug('Event: ' + str(event))
 
-            id, mbid, aid, tit, date, pt, = event
+            id, mbid, aid, tit, date, pt = event
             date = dt.strptime(date, '%Y-%m-%d')
 
             aname, = self.db.fetchone('artists', 'name', condition=
@@ -79,7 +86,7 @@ class RSSBuilder:
         self.channel.find('pubDate').text = now(self._d_fmt)
 
         with open(filename, 'w') as file:
-            file.write(tostring(self.root).decode('utf-8'))
+            file.write(self._xml_prolog + tostring(self.root).decode('utf-8'))
 
         logger.info('Feed saved to ' + filename)
 
