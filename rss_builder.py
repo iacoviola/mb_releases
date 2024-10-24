@@ -1,7 +1,10 @@
 from xml.etree.ElementTree import Element, SubElement, tostring
+
 from datetime import datetime as dt
+
 from ext import logger, now
-from db.db_handler import DBHandler as DBH
+
+from db.music_db import MusicDB as MDB
 
 class RSSBuilder:
     
@@ -11,7 +14,7 @@ class RSSBuilder:
     _link = 'http://iacohome.duckdns.org/music/new_releases.rss'
     _xml_prolog = '<?xml version="1.0" encoding="UTF-8"?>'
 
-    def __init__(self, db: DBH):
+    def __init__(self, db: MDB):
         self.db = db
         self.title = 'MB releases feed'
         self.link = 'https://musicbrainz.org'
@@ -34,12 +37,17 @@ class RSSBuilder:
         SubElement(self.channel, 'lastBuildDate').text = now(self._d_fmt)
         SubElement(self.channel, 'pubDate').text = ""
 
-        for event in self.db.get_releases(skip_types, d_past, d_fut):
+        for event in self.db.get_releasing(skip_types, d_past, d_fut):
                 
             logger.debug('Event: ' + str(event))
 
             id, mbid, aid, tit, date, pt = event
-            date = dt.strptime(date, '%Y-%m-%d')
+            
+            try:
+                date = dt.strptime(date, '%Y-%m-%d')
+            except ValueError:
+                logger.error('Invalid date: ' + date + " for release: " + tit)
+                continue
 
             aname, = self.db.fetchone('artists', 'name', condition=
                                       [{'condition': 'id = ?', 

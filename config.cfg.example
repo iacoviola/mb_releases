@@ -7,7 +7,9 @@ tg_id=#telegram chat/user id
 tg_token=#telegram bot token
 d_past=7 #number of days in the past to add to the rss feed
 d_fut=14 #number of days in the future to add the rss feed
+notify_days=7,0,-5 #days prior (+) and after (-) release date to send notification on
 [PATHS]
+artists=/path/to/mb_releases/artists.conf
 rss=/path/to/mb_releases/out/file.rss #you can output multiple rss files separated by comma
 ics=/path/to/mb_releases/out/file.ics #you can output multiple ics files separated by comma
 db=/path/to/mb_releases/db/music.db

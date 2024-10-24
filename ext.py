@@ -1,10 +1,15 @@
 import logging
-from configparser import ConfigParser
 import argparse
 import datetime
+
+from configparser import ConfigParser
+
 from os import chdir
 
 chdir('/home/emiliano/Desktop/mb_releases')
+
+def now(format='%Y-%m-%d'):
+    return datetime.datetime.now().strftime(format)
 
 config = ConfigParser()
 config.read('config.cfg')
@@ -25,6 +30,12 @@ argparser.add_argument('-t', '--type',
 argparser.add_argument('-n', '--notify',
                        help='Notify new releases to telegram',
                        action='store_true')
+argparser.add_argument('-a', '--auto',
+                       help='Auto mode for artists select, no user input',
+                       action='store_true')
+argparser.add_argument('-p', '--pick-artists',
+                       help='Pick artists to refresh',
+                       required=False)
 
 args = argparser.parse_args()
 
@@ -36,6 +47,3 @@ logger = logging.getLogger(__name__)
 
 if not args.type and not args.notify:
     argparser.error('No action requested, add -t or -n')
-
-def now(format='%Y-%m-%d'):
-    return datetime.datetime.now().strftime(format)

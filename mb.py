@@ -1,7 +1,10 @@
 import requests
-from urllib.parse import urlencode
 import time
+
+from urllib.parse import urlencode
+
 from ext import logger, config
+
 class MBR:
 
     b_url = 'http://musicbrainz.org/ws/2/' 
@@ -36,7 +39,7 @@ class MBR:
         
         r_url += '?' + self._url_encode(kw) + "&fmt=json"
 
-        hdr = {'User-Agent': f"MusicBrainz Release Calendar/0.1 ({config["CREDS"]["mail"]})"}
+        hdr = {'User-Agent': f"MusicBrainz Release Calendar/0.1 ({config['CREDS']['mail']})"}
 
         request = requests.get(r_url, headers=hdr)
         logger.debug('Requesting ' + request.url)

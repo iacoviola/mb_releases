@@ -164,8 +164,7 @@ cython_debug/
 #project related files
 out/*
 config.cfg
-music.db.old
-music.deb.db
+test/
 music-*.sql
 artists.txt.*
 class/

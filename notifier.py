@@ -1,126 +1,193 @@
-from datetime import datetime as dt, timedelta as td, date as da
-from time import time
+from datetime import datetime as dt, timedelta as td, date
 from ext import logger, now
-from db.db_handler import DBHandler as DBH
+
+from db.music_db import MusicDB as MDB
+
 import requests
+#import urllib
 
 class Notifier:
+    '''
+    Class to notify new releases to a telegram chat
+    '''
 
     _md_res = ['_', '*', '[', ']', '(', ')', '~', '`', '>',
                     '#', '+', '-', '=', '|', '{', '}', '.', '!']
 
     _url = 'https://api.telegram.org/bot'
-
     _r_mb_url = 'https://musicbrainz.org/release-group/'
 
-    _b_item_d = "*{name}* {verb} a new _{pt}{ot}_ on:\n\n*{date}*\n\n"
+    _b_item_h = "*{other}*\n\n*{aname} \\- {title}*:\n\n"
+    _b_item_d = "*{name}* {verb} a new _{pt}{ot}_ {some}:\n\n*{date}*\n\n"
     _b_item_l = "Check out more at [musicbrainz\\.org]({lnk}{mbid})"
+    _some = ['sometimes in', 'on']
     _b_verb = ['is releasing', 'released']
-    _v_selected = 0
+    _b_other = [u'\U0001F4C5' + ' Coming Soon',
+                u'\U0001F4E2' + ' Out Now' ,
+                u'\U000023F0' + ' Reminder',
+                u'\U00002728' + ' New Addition']
+    _s_verb = _s_other = 0
     _db_d_f = '%Y-%m-%d'
 
-    def __init__(self, db: DBH, tg_id, tg_token, notify_days):
+    def __init__(self, db: MDB, tg_id: str, tg_token: str, notify_days: str):
         self.db = db
         self.tg_id = tg_id
         self.tg_token = tg_token
         self._url += tg_token 
         self._n_d = [int(d) for d in notify_days.split(',')]
-        self._max_d = min(self._n_d)
+        self._min_d = min(self._n_d)
 
-    def _md_sanitize(self, str: str):
-        for r in self._md_res:
-            str = str.replace(r, '\\' + r)
-        return str
+    def notify(self, keep_types=[]):
+        '''
+        Selects and parses releases that need to be notified,
+        then sends them to the telegram chat
 
-    def notify(self, skip_types=[]):
-
-        for event in self.db.get_releases(skip_types, None, None,
+        Parameters:
+            keep_types (list): The types of releases to select
+        '''
+        for release in self.db.get_releasing(keep_types, None, None,
                                           ['last_notified'], 
                                           [{'condition': 
                                             """(last_notified IS NULL or 
-                                               last_notified < date(release_date - ?))""",
+                                               last_notified < date(release_date, ?))""",
                                              'params': 
-                                             (self._max_d * 86400,)}], 'DESC'):
+                                             (f'{-self._min_d} days',)}], 
+                                             'DESC'):
                 
-            logger.debug('Event: ' + str(event))
+            logger.debug('Release: ' + str(release))
 
-            self._v_selected = 0
+            self._s_verb = 0
+            self._s_other = 0
 
-            id, mbid, aid, tit, date, pt, ln = event
+            r_id, r_mbid, a_id, r_title, r_date, r_prim_type, r_lastnot = release
 
-            ln = dt.strptime(ln , self._db_d_f).date() if ln != None else None
-            date = dt.strptime(date, self._db_d_f).date()
+            if r_lastnot:
+                r_lastnot = dt.strptime(r_lastnot , self._db_d_f).date()
 
-            skip = False
-            nw = da.today()
+            is_unsure = len(r_date) <= 7
+            fmt_str = self._db_d_f[:5] if is_unsure else self._db_d_f
+            r_date = dt.strptime(r_date, fmt_str).date()
 
-            if not ln:
-                if date < nw:
-                    self._v_selected = 1
-            else:
-                for d in self._n_d:
-                    dd = date - td(days = d)
-                    if nw > dd and ln <= dd:
-                        skip = False
-                        if d < 0:
-                            self._v_selected = 1
-                        break
-                    else:
-                        skip = True
+            today = date.today()
 
-            if not skip:
-                aname, = self.db.fetchone('artists', 'name', condition=
-                                        [{'condition': 'id = ?', 
-                                            'params': (aid,)}])
-
-                j = [{'table': 'types_releases', 
-                    'condition': 'types.id = types_releases.type_id'}]
-                w = [{'condition': 'release_id = ?', 
-                    'params': (id,)}]
-
-                ot = self.db.fetchone('types', 'name', j, w)
-
-                if not ot:
-                    rt = ""
+            if not is_unsure:
+                if not r_lastnot:
+                    self._s_verb = 1 if r_date < today else 0
+                    self._s_other = 3
                 else:
-                    rt = "(" + ", ".join(ot) + ")"
+                    for d in self._n_d:
+                        target_day = r_date - td(days = d)
+                        if today >= target_day and r_lastnot < target_day:
+                            self._s_verb = 2 if d < 0 else (1 if d == 0 else 0)
+                            self._s_other = 0 if self._s_verb == 0 else self._s_verb - 1
+                            break
+                    continue
+            else:
+                if not r_lastnot:
+                    self._s_other = 3
 
-                self._send_item(id, mbid, aname, tit, date, pt, rt)
+            a_name = self.db.get_artist_name(a_id)
+            t_other = self.db.get_other_types(r_id)
+            r_types = f"({', '.join(t_other)})" if t_other else ""
 
+            self.__send_item(r_id, r_mbid, a_name, r_title, r_date, 
+                             r_prim_type, r_types, is_unsure)
 
-    def _send_item(self, id: str, mbid: str, aname: str, 
-                 title: str, date: dt, pt: str, rt: str):
+    def __send_item(self, r_id: str, r_mbid: str, a_name: str, 
+                    r_title: str, r_date: dt, r_prim_type: str, 
+                    r_types: str, is_unsure: bool):
+        '''
+        Shorthand method to both assemble and send a message
+
+        Parameters:
+            r_id (str): The id of the release
+            r_mbid (str): The musicbrainz id of the release
+            a_name (str): The name of the artist
+            r_title (str): The title of the release
+            r_date (datetime): The release date of the release
+            r_prim_type (str): The primary type of the release
+            r_types (str): The additional types of the release
+            is_unsure (bool): Whether the release date is uncertain
+        '''
+
+        msg = self.__assemble(r_mbid, a_name, r_title, r_date, 
+                              r_prim_type, r_types, is_unsure)
+        self.__telegram_send(msg, r_title, r_id)
+
+    def __assemble(self, r_mbid: str, a_name: str, 
+                   r_title: str, r_date: dt, r_prim_type: str, 
+                   r_types: str, is_unsure: bool):
+        '''
+        Assembles a message to be sent to the telegram chat
         
-        d_rss = date.strftime('%A, %B %d, %Y')
+        Parameters:
+            r_mbid (str): The musicbrainz id of the release
+            a_name (str): The name of the artist
+            r_title (str): The title of the release
+            r_date (datetime): The release date of the release
+            r_prim_type (str): The primary type of the release
+            r_types (str): The additional types of the release
+            is_unsure (bool): Whether the release date is uncertain
+        Returns:
+            str (str): The assembled message
+        '''
 
-        aname = self._md_sanitize(aname)
+        fmt = '%B, %Y' if is_unsure else '%A, %B %d, %Y'
+        r_date = r_date.strftime(fmt)
         
-        msg = f"*{aname} \\- {self._md_sanitize(title)}*:\n\n"
+        msg = self._b_item_h.format(other=self._b_other[self._s_other],
+                                    aname=self.__md_sanitize(a_name),
+                                    title=self.__md_sanitize(r_title))
         
-        msg += self._b_item_d.format(name=self._md_sanitize(aname),
-                                     verb=self._b_verb[self._v_selected],
-                                     pt=self._md_sanitize(pt),
-                                     ot=self._md_sanitize(rt),
-                                     date=d_rss)
+        msg += self._b_item_d.format(name=self.__md_sanitize(a_name),
+                                     verb=self._b_verb[self._s_verb],
+                                     some=self._some[0] if is_unsure else self._some[1],
+                                     pt=self.__md_sanitize(r_prim_type),
+                                     ot=self.__md_sanitize(r_types),
+                                     date=r_date)
         
         msg += self._b_item_l.format(lnk=self._r_mb_url,
-                                     mbid=self._md_sanitize(mbid))
+                                     mbid=self.__md_sanitize(r_mbid))
+        
+        return msg        
+    
+    def __telegram_send(self, msg: str, r_title: str, r_id: str):
+        '''  
+        Sends a message to the configured telegram chat
+
+        Parameters:
+            msg (str): The message to send
+            r_title (str): The title of the release
+            r_id (str): The id of the release
+        '''
         
         params = {'chat_id': self.tg_id,
                   'text': msg,
                   'parse_mode': 'MarkdownV2'}
         
+        #TODO: replace requests with urllib
         r = requests.post(self._url + "/sendMessage", json=params)
         
         logger.debug(r.text)
-        logger.debug(msg)
+        logger.debug("Composed message: " + msg)
 
         if r.status_code == 200:
-            logger.info(f"Sent notification for {title} to telegram")
-            self.db.update('releases', 
-                            columns=('last_notified',),
-                            values=(now(),), 
-                            condition=[{'condition': 'id = ?', 
-                                        'params': (id,)}])
+            logger.info(f"Sent notification for {r_title} to telegram")
+            self.db.update(table='releases', 
+                           columns=('last_notified',),
+                           values=(now(),), 
+                           condition=[{'condition': 'id = ?', 
+                                        'params': (r_id,)}])
 
+    def __md_sanitize(self, str: str):
+        '''
+        Sanitizes a string to be used in a markdown message
 
+        Parameters:
+            str (str): The string to sanitize
+        Returns:
+            str (str): The sanitized string
+        '''
+        for r in self._md_res:
+            str = str.replace(r, '\\' + r)
+        return str
