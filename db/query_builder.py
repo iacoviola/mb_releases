@@ -28,12 +28,11 @@ class QueryBuilder:
         self._table = f'{table} {alias_q}'
         return self
     
-    #def table(self, table):
-    #    self._table = table
-    #    return self
-    
     def get_params(self):
         return self._params
+    
+    def build(self):
+        raise NotImplementedError
 
 class SelectQuery(QueryBuilder):
     def __init__(self):

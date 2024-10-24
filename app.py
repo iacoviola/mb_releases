@@ -1,6 +1,8 @@
+import logging
+
 from datetime import date, timedelta as td
 
-from ext import logger, args, config, now
+from ext import setup_logger, args, config, now
 
 from mb import MBR
 
@@ -10,6 +12,10 @@ from notifier import Notifier
 
 from db.db_handler import CONFLICT as CON, STATUS as STAT
 from db.music_db import MusicDB as MDB
+
+setup_logger()
+
+logger = logging.getLogger(__name__)
 
 artists_path = 'parsed_artists.txt'
 
@@ -355,7 +361,7 @@ if __name__ == '__main__':
     
     if args.type == 'rss' or args.type == 'all':
         builder = RSB(db)
-        builder.generate_feed(keep_rt, d_past, d_fut)
+        builder.build_feed(keep_rt, d_past, d_fut)
         for path in rss_path:
             builder.save(path)
 

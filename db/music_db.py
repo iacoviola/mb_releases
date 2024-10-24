@@ -1,6 +1,9 @@
+import logging
+
 from db.db_handler import DBHandler as DBH
-from ext import logger
 from db.query_builder import SelectQuery as Sel, UpdateQuery as Upd
+
+logger = logging.getLogger(__name__)
 
 class MusicDB(DBH):
 

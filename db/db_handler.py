@@ -1,9 +1,10 @@
 import sqlite3
+import logging
 
 from db.query_builder import SelectQuery as Sel
 from db.query_builder import UpdateQuery as Upd
 
-from ext import logger
+logger = logging.getLogger(__name__)
 
 class CONFLICT:
     IGNORE = 'IGNORE'

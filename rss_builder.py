@@ -1,101 +1,139 @@
+import logging
+
 from xml.etree.ElementTree import Element, SubElement, tostring
 
 from datetime import datetime as dt
 
-from ext import logger, now
+from ext import now
 
 from db.music_db import MusicDB as MDB
 
+logger = logging.getLogger(__name__)
+
 class RSSBuilder:
-    
-    _b_item_d = "{name} is releasing a new {pt}{ot} on {date}"
-    _b_item_l = "https://musicbrainz.org/release-group/{mbid}"
-    _d_fmt = '%a, %d %b %Y %H:%M:%S +0200'
-    _link = 'http://iacohome.duckdns.org/music/new_releases.rss'
-    _xml_prolog = '<?xml version="1.0" encoding="UTF-8"?>'
+    '''
+    Class to generate an RSS feed for new releases
+
+    Attributes:
+        __db (MDB): The database object
+        __f_title (str): The title of the feed
+        __f_link (str): The link of the feed
+        __f_desc (str): The description of the feed
+        __f_lang (str): The language of the feed
+        __message_b (str): The body of the message (template)
+        __message_l (str): The link of the message (template)
+        __db_d_f (str): The date format of the database
+        __rss_link (str): The link of the rss feed
+        __xml_prolog (str): The prolog of the xml
+        __root (Element): The root element of the xml
+        __channel (Element): The channel element of the xml
+    '''
 
     def __init__(self, db: MDB):
-        self.db = db
-        self.title = 'MB releases feed'
-        self.link = 'https://musicbrainz.org'
-        self.description = 'A feed for your music releases'
-        self.language = 'en-us'
+        self.__db = db
+        self.__f_title = 'MB releases feed'
+        self.__f_link = 'https://musicbrainz.org'
+        self.__f_desc = 'A feed for your music releases'
+        self.__f_lang = 'en-us'
 
-    def generate_feed(self, skip_types=[], d_past=-1, d_fut=-1):
+        self.__message_b = "{a_name} is releasing a new {pt}{ot} on {r_date}"
+        self.__message_l = "https://musicbrainz.org/release-group/{r_mbid}"
 
-        self.root = Element('rss', {'version': '2.0'})
-        self.root.set('xmlns:atom', 'http://www.w3.org/2005/Atom')
-        self.channel = SubElement(self.root, 'channel')
-        SubElement(self.channel, 'atom:link', 
-                   {'href': self._link,
+        self.__db_d_f = '%a, %d %b %Y %H:%M:%S +0200'
+
+        self.__rss_link = ''
+        self.__xml_prolog = '<?xml version="1.0" encoding="UTF-8"?>'
+
+        self.__root = None
+        self.__channel = None
+
+    def build_feed(self, keep_types: list = [], d_past: int = -1, d_fut: int = -1):
+        '''
+        Builds the feed
+
+        Parameters:
+            keep_types (list): The types of releases to select
+            d_past (int): Number of days in the past to generate
+            d_fut (int): Number of days in the future to generate
+        '''
+
+        self.__root = Element('rss', {'version': '2.0'})
+        self.__root.set('xmlns:atom', 'http://www.w3.org/2005/Atom')
+        self.__channel = SubElement(self.__root, 'channel')
+        SubElement(self.__channel, 'atom:link', 
+                   {'href': self.__rss_link,
                     'rel': 'self',
                     'type': 'application/rss+xml'})
-        SubElement(self.channel, 'title').text = self.title
-        SubElement(self.channel, 'link').text = self.link
-        SubElement(self.channel, 'description').text = self.description
-        SubElement(self.channel, 'language').text = self.language
-        SubElement(self.channel, 'lastBuildDate').text = now(self._d_fmt)
-        SubElement(self.channel, 'pubDate').text = ""
+        SubElement(self.__channel, 'title').text = self.__f_title
+        SubElement(self.__channel, 'link').text = self.__f_link
+        SubElement(self.__channel, 'description').text = self.__f_desc
+        SubElement(self.__channel, 'language').text = self.__f_lang
+        SubElement(self.__channel, 'lastBuildDate').text = now(self.__db_d_f)
+        SubElement(self.__channel, 'pubDate').text = ""
 
-        for event in self.db.get_releasing(skip_types, d_past, d_fut):
+        for event in self.__db.get_releasing(keep_types, d_past, d_fut):
                 
             logger.debug('Event: ' + str(event))
 
-            id, mbid, aid, tit, date, pt = event
+            r_id, r_mbid, a_id, r_title, r_date, r_prim_type = event
             
             try:
-                date = dt.strptime(date, '%Y-%m-%d')
+                r_date = dt.strptime(r_date, '%Y-%m-%d')
             except ValueError:
-                logger.error('Invalid date: ' + date + " for release: " + tit)
+                logger.error('Invalid date: ' + r_date + " for release: " + r_title)
                 continue
 
-            aname, = self.db.fetchone('artists', 'name', condition=
-                                      [{'condition': 'id = ?', 
-                                        'params': (aid,)}])
+            a_name = self.__db.get_artist_name(a_id)
+            t_other = self.__db.get_other_types(r_id)
 
-            j = [{'table': 'types_releases', 
-                  'condition': 'types.id = types_releases.type_id'}]
-            w = [{'condition': 'release_id = ?', 
-                  'params': (id,)}]
+            data = {
+                'r_id': r_id,
+                'r_mbid': r_mbid,
+                'a_name': a_name,
+                'r_title': r_title,
+                'r_date': r_date,
+                'r_prim_type': r_prim_type,
+                't_other': t_other
+            }
 
-            ot = self.db.fetchone('types', 'name', j, w)
-
-            if not ot:
-                rt = ""
-            else:
-                rt = '(' + ', '.join(ot) + ')'
-
-            self._add_item(mbid, aname, tit, date, pt, rt)
+            self.__add_item(data)
 
 
-    def _add_item(self, mbid: str, aname: str, 
-                 title: str, date: dt, pt: str, rt: str):
-        
-        item = SubElement(self.channel, 'item')
-        SubElement(item, 'title').text = f'{aname} - {title}'
-        SubElement(item, 'link').text = self._b_item_l.format(mbid=mbid)
+    def __add_item(self, data: dict):
+        '''
+        Adds an item to the feed
 
-        d_rss = date.strftime('%a, %d %b')
+        Parameters:
+            data (dict): The data of the item
+        '''
 
-        SubElement(item, 'description').text = self._b_item_d.format(name=aname,
-                                                                     pt=pt,
-                                                                     ot=rt,
-                                                                     date=d_rss)
+        r_types = f"({', '.join(data['t_other'])})" if data['t_other'] else ""
+        date_p = data['r_date'].strftime('%a, %d %b')
+        date_f = data['r_date'].strftime(self.__db_d_f)
 
-        date = date.strftime(self._d_fmt)
-        
+        item = SubElement(self.__channel, 'item')
+        SubElement(item, 'title').text = f'{data['a_name']} - {data['r_title']}'
+        SubElement(item, 'link').text = self.__message_l.format(r_mbid=data['r_mbid'])
+        SubElement(item, 'description').text = self.__message_b.format(a_name=data['a_name'],
+                                                                       pt=data['r_prim_type'],
+                                                                       ot=r_types,
+                                                                       r_date=date_p)
+        SubElement(item, 'pubDate').text = date_f
+        SubElement(item, 'guid', {'isPermaLink': 'false'}).text = f'{data['r_id']}'
+        SubElement(item, 'category').text = f'{data['r_prim_type']}{r_types}'
 
-        SubElement(item, 'pubDate').text = date
-        SubElement(item, 'guid', {'isPermaLink': 'false'}).text = f'{mbid}'
-        #SubElement(item, 'author').text = f'{aname}'
-        SubElement(item, 'category').text = f'{pt}{"(" + rt + ")" if rt else ""}'
+    def save(self, file_name: str):
+        '''
+        Saves the feed to a file
 
-    def save(self, filename: str):
-        self.channel.find('pubDate').text = now(self._d_fmt)
+        Parameters:
+            file_name (str): The name of the file to save the feed to
+        '''
+        self.__channel.find('pubDate').text = now(self.__db_d_f)
 
-        with open(filename, 'w') as file:
-            file.write(self._xml_prolog + tostring(self.root).decode('utf-8'))
+        with open(file_name, 'w') as file:
+            file.write(self.__xml_prolog + tostring(self.__root).decode('utf-8'))
 
-        logger.info('Feed saved to ' + filename)
+        logger.info('Feed saved to ' + file_name)
 
 

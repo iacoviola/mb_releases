@@ -1,9 +1,9 @@
 BEGIN:VEVENT
-SUMMARY:{artist} - {name}
+SUMMARY:{a_name} - {r_title}
 UID:{uid}
 TRANSP:TRANSPARENT
 DTSTAMP:{tstamp}
-DTSTART;VALUE=DATE:{date}
+DTSTART;VALUE=DATE:{r_date}
 CATEGORIES:Music,{categories}
-DESCRIPTION:{artist} is releasing a new {type}:\n{name}
+DESCRIPTION:{a_name} is releasing a new {type}:\n{r_title}
 END:VEVENT
