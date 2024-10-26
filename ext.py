@@ -60,13 +60,21 @@ if not args.type and not args.notify:
     argparser.error('No action requested, add -t or -n')
 
 def setup_logger():
-    level = logging.DEBUG if args.verbose else logging.INFO
+    format = '[%(asctime)s]'
+
+    if args.verbose:
+        level = logging.DEBUG
+        format += '%(levelname)s:%(filename)s:'
+    else:
+        level = logging.INFO
+    format += '%(message)s'
+
     logging_config = {
         'version': 1,
         'disable_existing_loggers': False,
         'formatters': {
             'standard': {
-                'format': '[%(asctime)s]%(levelname)s:%(filename)s:%(message)s',
+                'format': format,
                 #'datefmt': '%Y-%m-%d@%H:%M:%S',
                 'datefmt': '%H:%M:%S'
             },

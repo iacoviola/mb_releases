@@ -1,0 +1,5 @@
+[SETTINGS]
+tg_id=#telegram chat/user id
+tg_token=#telegram bot token
+[PATHS]
+db=/path/to/mb_releases/db/music.db

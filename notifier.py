@@ -78,19 +78,19 @@ class Notifier:
             keep_types (list): The types of releases to select
         '''
         for release in self.__db.get_releasing(keep_types, None, None,
-                                          ['last_notified'], 
+                                          ['last_notified', 'still_interesting'], 
                                           [{'condition': 
                                             """(last_notified IS NULL or 
-                                               last_notified < date(release_date, ?))""",
+                                                last_notified < date(release_date, ?) and
+                                                still_interesting = 1)""",
                                              'params': 
                                              (f'{-self.__min_d} days',)}], 
                                              'DESC'):
                 
             logger.debug('Release: ' + str(release))
-
             s_verb = s_header = 0
 
-            r_id, r_mbid, a_id, r_title, r_date, r_prim_type, r_lastnot = release
+            r_id, r_mbid, a_id, r_title, r_date, r_prim_type, r_lastnot, _ = release
 
             if r_lastnot:
                 r_lastnot = dt.strptime(r_lastnot , self.__db_d_f).date()
@@ -106,13 +106,16 @@ class Notifier:
                     s_verb = int(r_date < today)
                     s_header = 3 if r_date < today else int(r_date == today)
                 else:
+                    do_send = False
                     for d in self.__n_d:
                         target_day = r_date - td(days = d)
                         if today >= target_day and r_lastnot < target_day:
-                            s_verb = 2 if d < 0 else int(d == 0)
-                            s_header = 0 if s_verb == 0 else s_verb - 1
+                            s_verb = int(d < 0)
+                            s_header = 2 if s_verb == 1 else int(d == 0)
+                            do_send = True
                             break
-                    continue
+                    if not do_send:
+                        continue
             else:
                 if not r_lastnot:
                     s_header = 3
@@ -145,7 +148,7 @@ class Notifier:
         '''
 
         msg = self.__assemble(data, is_unsure, s_verb, s_header)
-        self.__telegram_send(msg, data['r_title'], data['r_id'])
+        self.__telegram_send(msg, data['r_title'], data['r_id'], s_header > 0)
 
     def __assemble(self, data: dict, is_unsure: bool,
                    s_verb: int, s_other: int):
@@ -162,14 +165,14 @@ class Notifier:
         '''
 
         fmt = '%B, %Y' if is_unsure else '%A, %B %d, %Y'
-        r_date = r_date.strftime(fmt)
+        r_date = data['r_date'].strftime(fmt)
         r_types = f"({', '.join(data['t_other'])})" if data['t_other'] else ""
         
         msg = self.__message_h.format(header=self.__headers[s_other],
                                       a_name=MDS.sanitize(data['a_name']),
                                       r_title=MDS.sanitize(data['r_title']))
         
-        msg += self.__message_b.format(r_name=MDS.sanitize(data['a_name']),
+        msg += self.__message_b.format(a_name=MDS.sanitize(data['a_name']),
                                        verb=self.__verbs[s_verb],
                                        precision=self.__precisions[int(is_unsure)],
                                        pt=MDS.sanitize(data['r_prim_type']),
@@ -181,7 +184,7 @@ class Notifier:
         
         return msg        
     
-    def __telegram_send(self, msg: str, r_title: str, r_id: str):
+    def __telegram_send(self, msg: str, r_title: str, r_id: str, ack: bool = False):
         '''  
         Sends a message to the configured telegram chat
 
@@ -190,10 +193,18 @@ class Notifier:
             r_title (str): The title of the release
             r_id (str): The id of the release
         '''
+
+        inline = [{'text': u'\U0001F44E', 'callback_data': 'unwanted'}]
+
+        if ack:
+            inline.insert(0, {'text': u'\U0001F44D', 'callback_data': 'downloaded'})
         
         params = {'chat_id': self.__tg_id,
                   'text': msg,
-                  'parse_mode': 'MarkdownV2'}
+                  'parse_mode': 'MarkdownV2',
+                  'reply_markup': {'inline_keyboard': [inline]}
+                  }
+            
         
         result = requests.post(self.__tg_url + "/sendMessage", json=params)
         
@@ -201,9 +212,12 @@ class Notifier:
         logger.debug("Composed message: " + msg)
 
         if result.status_code == 200:
+            
+            msg_id = int(result.json()['result']['message_id'])
+
             logger.info(f"Sent notification for {r_title} to telegram")
             self.__db.update(table='releases', 
-                           columns=('last_notified',),
-                           values=(now(),), 
+                           columns=('last_notified', 'last_msg_id'),
+                           values=(now(), msg_id), 
                            condition=[{'condition': 'id = ?', 
                                         'params': (r_id,)}])

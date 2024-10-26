@@ -118,9 +118,8 @@ def load_lines(file_path: str) -> tuple[list[str], int]:
         if line.startswith('\n') or line.isspace() or line.startswith('['):
             lines.pop(i)
             if line.lower().strip() == '[new]':
-                new_artists = i + 1
-        else:
-            i += 1
+                new_artists = i
+        i += 1
 
     return lines, new_artists
 
@@ -162,7 +161,7 @@ def handle_artist(artist_name: str, auto: bool = False) -> tuple[str, str, str]:
             print("Choose one of the following for " + artist_name + ":")
         for i, a in enumerate(result):
             dis = a.get('disambiguation', "")
-            print("\t" + str(i) + ": " + a['name'] + f" ({dis})" if dis else "")
+            print("\t" + str(i) + ": " + a['name'] + (f" ({dis})" if dis else ""))
         c = input('number [0] -> ')
         while True:
             if c.isdigit() and int(c) >= 0 and int(c) <= len(result):

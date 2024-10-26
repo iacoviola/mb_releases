@@ -7,6 +7,10 @@ from db.query_builder import UpdateQuery as Upd
 logger = logging.getLogger(__name__)
 
 class CONFLICT:
+    '''
+    Enum for conflict resolution strategies
+    '''
+
     IGNORE = 'IGNORE'
     REPLACE = 'REPLACE'
     ROLLBACK = 'ROLLBACK'
@@ -14,6 +18,10 @@ class CONFLICT:
     FAIL = 'FAIL'
 
 class STATUS:
+    '''
+    Enum describing the status of an operation
+    '''
+    
     INSERT = 'INSERT'
     UPDATE = 'UPDATE'
     FAIL = 'FAIL'
@@ -23,17 +31,31 @@ class DBHandler:
     Class to handle core database operations
     '''
 
-    def __new__(cls, db_name):
+    def __new__(cls, db_path: str):
+        '''
+        Singleton pattern to ensure only one instance of the class is created
+
+        Parameters:
+            db_path (str): Database file name
+
+        Returns:
+            DBHandler: Instance of the class
+        '''
+
         if not hasattr(cls, 'instance'):
             cls.instance = super(DBHandler, cls).__new__(cls)
-            cls.instance.conn = sqlite3.connect(db_name)
+            cls.instance.conn = sqlite3.connect(db_path)
             cls.instance.cursor = cls.instance.conn.cursor()
         return cls.instance
     
     def close(self):
+        '''
+        Close the database connection
+        '''
+
         self.conn.close()
 
-    def _fetchbuild(self, table, columns='*', joins=None, wheres=None,
+    def __fetchbuild(self, table, columns='*', joins=None, wheres=None,
                     order_by=None):
         qb = Sel().select(columns).table(table)
         if joins:
@@ -54,7 +76,7 @@ class DBHandler:
 
     def fetchall(self, table, columns='*', joins=None, wheres=None,
                  order_by=None):
-        query, params = self._fetchbuild(table, 
+        query, params = self.__fetchbuild(table, 
                                          columns, 
                                          joins, 
                                          wheres,
@@ -65,7 +87,7 @@ class DBHandler:
     
     def fetchone(self, table, columns='*', joins=None, condition=None,
                  order_by=None):
-        query, params = self._fetchbuild(table, 
+        query, params = self.__fetchbuild(table, 
                                          columns, 
                                          joins, 
                                          condition,
@@ -76,7 +98,7 @@ class DBHandler:
     
     def fetchsingle(self, table, column, joins=None, condition=None,
                     order_by=None):
-        query, params = self._fetchbuild(table, 
+        query, params = self.__fetchbuild(table, 
                                          column, 
                                          joins, 
                                          condition,
@@ -155,7 +177,16 @@ class DBHandler:
         self.cursor.execute(query, params)
         self.conn.commit()
 
-    def delete(self, table, condition, params=()):
+    def delete(self, table: str, condition: str, params: set = ()):
+        '''
+        Delete rows from a table
+
+        Parameters:
+            table (str): Table name
+            condition (str): Condition to delete rows
+            params (tuple): Parameters for the condition
+        '''
+
         query = f"DELETE FROM {table} WHERE {condition}"
         self.cursor.execute(query, params)
         self.conn.commit()

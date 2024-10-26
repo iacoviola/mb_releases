@@ -63,5 +63,9 @@ UPDATE 'releases' SET 'last_notified' = '2024-09-07' WHERE 'notified' = 1;
 
 ALTER TABLE 'releases' DROP COLUMN 'notified';
 
+-- Fourth revision
+
+ALTER TABLE 'releases' ADD COLUMN 'last_msg_id' INTEGER DEFAULT NULL;
+ALTER TABLE 'releases' ADD COLUMN 'still_interesting' BOOLEAN DEFAULT TRUE;
 
 COMMIT;
